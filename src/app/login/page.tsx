@@ -23,7 +23,7 @@ export default function LoginPage() {
 
     try {
       const res = await api.post('/auth/login', form);
-      login(res.data.user);
+      login(res.data.user, res.data.access_token);
     } catch (err) {
       console.log('Full error:', err);
       const axiosError = err as AxiosError<{ message?: string }>;

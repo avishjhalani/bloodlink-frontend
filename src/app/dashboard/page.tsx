@@ -55,6 +55,7 @@ export default function DashboardPage() {
   const [myRequests, setMyRequests] = useState<BloodRequest[]>([]); // User's own requests
   const [allActiveRequests, setAllActiveRequests] = useState<BloodRequest[]>([]); // Global feed
   const [loading, setLoading] = useState(true);
+  const [acceptingIds, setAcceptingIds] = useState<number[]>([]);
 
   // Fulfillment Dialog State
   const [fulfillModalOpen, setFulfillModalOpen] = useState(false);
@@ -126,6 +127,27 @@ export default function DashboardPage() {
       console.error('Error fulfilling request:', err);
     } finally {
       setSubmittingFulfillment(false);
+    }
+  };
+
+  const handleAcceptRequest = async (requestId: number) => {
+    setAcceptingIds(prev => [...prev, requestId]);
+    try {
+      await api.post(`/donors/confirm/${requestId}`);
+      
+      // Re-fetch requests
+      const [resCompatible, resMine, resActive] = await Promise.all([
+        api.get('/requests/compatible'),
+        api.get('/requests'),
+        api.get('/requests/active'),
+      ]);
+      setActiveRequests(resCompatible.data);
+      setMyRequests(resMine.data);
+      setAllActiveRequests(resActive.data);
+    } catch (err) {
+      console.error('Error accepting request:', err);
+    } finally {
+      setAcceptingIds(prev => prev.filter(id => id !== requestId));
     }
   };
 
@@ -254,6 +276,33 @@ export default function DashboardPage() {
                           <p className="text-green-600 font-semibold">{req.donorsConfirmed} confirmed</p>
                           <p className="text-[10px] mt-1">{new Date(req.createdAt).toLocaleDateString()}</p>
                         </div>
+                      </div>
+                      
+                      <div className="mt-4 pt-3 border-t border-gray-50 flex justify-end">
+                        {(() => {
+                          const myNotification = req.notifications?.find(n => n.donorId === currentUser?.id);
+                          const isAccepted = myNotification?.status === 'confirmed' || myNotification?.status === 'completed';
+                          
+                          if (isAccepted) {
+                            return (
+                              <Badge className="bg-green-50 text-green-700 border-green-200 text-xs px-2.5 py-1">
+                                <span>✓ Accepted & Confirmed</span>
+                              </Badge>
+                            );
+                          }
+                          
+                          const isAccepting = acceptingIds.includes(req.id);
+                          return (
+                            <Button
+                              size="sm"
+                              className="bg-red-600 hover:bg-red-700 text-white font-medium text-xs px-4 shadow-sm"
+                              onClick={() => handleAcceptRequest(req.id)}
+                              disabled={isAccepting}
+                            >
+                              {isAccepting ? 'Accepting...' : '🤝 Accept Request'}
+                            </Button>
+                          );
+                        })()}
                       </div>
                     </CardContent>
                   </Card>

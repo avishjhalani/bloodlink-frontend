@@ -14,7 +14,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (user: User) => void;
+  login: (user: User, token?: string) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch {
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
       } finally {
         setIsLoading(false);
       }
@@ -42,8 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTimeout(initializeAuth, 0);
   }, []);
 
-  const login = (user: User) => {
+  const login = (user: User, token?: string) => {
     localStorage.setItem('user', JSON.stringify(user));
+    if (token) {
+      localStorage.setItem('token', token);
+    }
     setUser(user);
     
     const redirectPath = localStorage.getItem('redirect_after_login');
@@ -62,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Failed to log out on server:', e);
     } finally {
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
       setUser(null);
       router.push('/login');
     }

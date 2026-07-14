@@ -80,7 +80,7 @@ export default function RegisterPage() {
         lng: parseFloat(form.lng),
       });
       
-      login(res.data.user);
+      login(res.data.user, res.data.access_token);
     } catch (err) {
       console.log('Full error:', err);
       const axiosError = err as AxiosError<{ message?: string }>;
