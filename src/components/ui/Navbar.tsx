@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -30,12 +30,7 @@ export default function Navbar() {
             <Link href="/analytics">
               <Button variant="ghost" size="sm">Analytics</Button>
             </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={logout}
-              className="text-gray-500"
-            >
+            <Button variant="ghost" size="sm" onClick={logout} className="text-gray-500">
               Logout
             </Button>
           </>

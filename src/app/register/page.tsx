@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
+import { AxiosError } from 'axios';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
@@ -25,6 +26,10 @@ export default function RegisterPage() {
     lng: '',
   });
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
+  const [searching, setSearching] = useState(false);
+
   const getLocation = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -38,31 +43,52 @@ export default function RegisterPage() {
     );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError('');
+  const searchLocation = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setError('');
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`,
+        {
+          headers: {
+            'User-Agent': 'BloodLink-App/1.0',
+          },
+        }
+      );
+      const data = await response.json();
+      setSuggestions(data);
+      if (data.length === 0) {
+        setError('No locations found. Try adjusting your search.');
+      }
+    } catch {
+      setError('Failed to search location.');
+    } finally {
+      setSearching(false);
+    }
+  };
 
-  try {
-    const res = await api.post('/auth/register', {
-      ...form,
-      lat: parseFloat(form.lat),
-      lng: parseFloat(form.lng),
-    });
-    
-    // Manually save to localStorage first
-    localStorage.setItem('token', res.data.access_token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
-    
-    // Then redirect
-    window.location.href = '/dashboard';
-  } catch (err: any) {
-    console.log('Full error:', err);
-    setError(err.response?.data?.message || 'Registration failed');
-  } finally {
-    setLoading(false);
-  }
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await api.post('/auth/register', {
+        ...form,
+        lat: parseFloat(form.lat),
+        lng: parseFloat(form.lng),
+      });
+      
+      login(res.data.user);
+    } catch (err) {
+      console.log('Full error:', err);
+      const axiosError = err as AxiosError<{ message?: string }>;
+      setError(axiosError.response?.data?.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
@@ -126,6 +152,47 @@ export default function RegisterPage() {
             </div>
             <div>
               <Label>Your Location</Label>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search city, area, landmark..."
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      searchLocation();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  onClick={searchLocation}
+                  disabled={searching}
+                  className="bg-red-600 hover:bg-red-700 text-white shrink-0"
+                >
+                  {searching ? 'Searching...' : 'Search'}
+                </Button>
+              </div>
+
+              {suggestions.length > 0 && (
+                <div className="border rounded-md bg-white shadow-lg max-h-60 overflow-y-auto mb-2 divide-y text-sm border-gray-200">
+                  {suggestions.map((s, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setForm(f => ({ ...f, lat: s.lat, lng: s.lon }));
+                        setSearchQuery(s.display_name);
+                        setSuggestions([]);
+                      }}
+                      className="px-3 py-2 cursor-pointer hover:bg-red-50 text-gray-700 transition-colors flex gap-2 items-start"
+                    >
+                      <span className="shrink-0">📍</span>
+                      <span>{s.display_name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <Button
                 type="button"
                 variant="outline"
@@ -134,23 +201,20 @@ export default function RegisterPage() {
               >
                 📍 Use My Current Location
               </Button>
+
               {form.lat && form.lng && (
-                <p className="text-sm text-green-600">
-                  ✅ Location captured: {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}
-                </p>
-              )}
-              {!form.lat && (
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    value={form.lat}
-                    onChange={e => setForm(f => ({ ...f, lat: e.target.value }))}
-                    placeholder="Latitude"
-                  />
-                  <Input
-                    value={form.lng}
-                    onChange={e => setForm(f => ({ ...f, lng: e.target.value }))}
-                    placeholder="Longitude"
-                  />
+                <div className="bg-green-50 text-green-800 border border-green-200 rounded-md p-2.5 text-xs flex justify-between items-center mt-2">
+                  <span>✅ Location Captured: {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm(f => ({ ...f, lat: '', lng: '' }));
+                      setSearchQuery('');
+                    }}
+                    className="text-green-600 hover:text-green-800 font-bold ml-2 cursor-pointer"
+                  >
+                    Clear
+                  </button>
                 </div>
               )}
             </div>

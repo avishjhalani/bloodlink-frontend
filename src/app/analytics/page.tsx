@@ -7,16 +7,44 @@ import Navbar from '@/components/ui/Navbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
 
+interface AnalyticsOverview {
+  requests: {
+    total: number;
+    active: number;
+    fulfilled: number;
+    fulfillmentRate: string;
+  };
+  donors: {
+    total: number;
+    available: number;
+  };
+  notifications: {
+    total: number;
+    confirmed: number;
+    confirmationRate: string;
+  };
+}
+
+interface BloodTypeStatItem {
+  bloodType: string;
+  count: number;
+}
+
+interface BloodTypeStats {
+  requestsByBloodType: BloodTypeStatItem[];
+  donorsByBloodType: BloodTypeStatItem[];
+}
+
 export default function AnalyticsPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const [overview, setOverview] = useState<any>(null);
-  const [bloodTypes, setBloodTypes] = useState<any>(null);
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
+  const [bloodTypes, setBloodTypes] = useState<BloodTypeStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [user, isLoading]);
+  }, [user, isLoading, router]);
 
   useEffect(() => {
     if (user) {
@@ -30,7 +58,7 @@ export default function AnalyticsPage() {
     }
   }, [user]);
 
-  if (loading || !overview) {
+  if (loading || !overview || !bloodTypes) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">Loading analytics...</p>
@@ -102,7 +130,7 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader><CardTitle>Requests by Blood Type</CardTitle></CardHeader>
             <CardContent>
-              {bloodTypes.requestsByBloodType.map((item: any) => (
+              {bloodTypes.requestsByBloodType.map((item: BloodTypeStatItem) => (
                 <div key={item.bloodType} className="flex justify-between py-2 border-b last:border-0">
                   <span className="font-semibold text-red-600">{item.bloodType}</span>
                   <span className="font-bold">{item.count}</span>
@@ -113,7 +141,7 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader><CardTitle>Donors by Blood Type</CardTitle></CardHeader>
             <CardContent>
-              {bloodTypes.donorsByBloodType.map((item: any) => (
+              {bloodTypes.donorsByBloodType.map((item: BloodTypeStatItem) => (
                 <div key={item.bloodType} className="flex justify-between py-2 border-b last:border-0">
                   <span className="font-semibold text-red-600">{item.bloodType}</span>
                   <span className="font-bold">{item.count}</span>

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
+import { AxiosError } from 'axios';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -15,25 +16,22 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [form, setForm] = useState({ email: '', password: '' });
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError('');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-  try {
-    const res = await api.post('/auth/login', form);
-    
-    localStorage.setItem('token', res.data.access_token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
-    
-    window.location.href = '/dashboard';
-  } catch (err: any) {
-    console.log('Full error:', err);
-    setError(err.response?.data?.message || 'Login failed');
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      const res = await api.post('/auth/login', form);
+      login(res.data.user);
+    } catch (err) {
+      console.log('Full error:', err);
+      const axiosError = err as AxiosError<{ message?: string }>;
+      setError(axiosError.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
 

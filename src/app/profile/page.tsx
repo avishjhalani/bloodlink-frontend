@@ -9,16 +9,37 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import api from '@/lib/api';
 
+interface Notification {
+  id: number;
+  requestId: number;
+  status: string;
+  request: {
+    bloodType: string;
+    hospital: string;
+  };
+}
+
+interface Profile {
+  name: string;
+  email: string;
+  bloodType: string;
+  totalDonations: number;
+  reliabilityScore: number;
+  isAvailable: boolean;
+  lastDonationDate?: string;
+  recentNotifications: Notification[];
+}
+
 export default function ProfilePage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [user, isLoading]);
+  }, [user, isLoading, router]);
 
   useEffect(() => {
     if (user) {
@@ -32,7 +53,7 @@ export default function ProfilePage() {
     setToggling(true);
     try {
       const res = await api.patch('/donors/availability');
-      setProfile((p: any) => ({ ...p, isAvailable: res.data.isAvailable }));
+      setProfile(p => p ? { ...p, isAvailable: res.data.isAvailable } : null);
     } finally {
       setToggling(false);
     }
@@ -40,7 +61,7 @@ export default function ProfilePage() {
 
   const markDonated = async () => {
     await api.patch('/donors/donated');
-    setProfile((p: any) => ({ ...p, lastDonationDate: new Date().toISOString() }));
+    setProfile(p => p ? { ...p, lastDonationDate: new Date().toISOString() } : null);
   };
 
   if (loading || !profile) {
@@ -130,7 +151,7 @@ export default function ProfilePage() {
               <p className="text-gray-500 text-center py-4">No notifications yet</p>
             ) : (
               <div className="space-y-3">
-                {profile.recentNotifications.map((notif: any) => (
+                {profile.recentNotifications.map((notif: Notification) => (
                   <div key={notif.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                     <div>
                       <span className="font-semibold text-red-600">{notif.request.bloodType}</span>
@@ -148,12 +169,12 @@ export default function ProfilePage() {
                           size="sm"
                           className="bg-green-600 hover:bg-green-700"
                           onClick={() => api.post(`/donors/confirm/${notif.requestId}`).then(() => {
-                            setProfile((p: any) => ({
+                            setProfile(p => p ? {
                               ...p,
-                              recentNotifications: p.recentNotifications.map((n: any) =>
+                              recentNotifications: p.recentNotifications.map((n: Notification) =>
                                 n.id === notif.id ? { ...n, status: 'confirmed' } : n
                               )
-                            }));
+                            } : null);
                           })}
                         >
                           Confirm
