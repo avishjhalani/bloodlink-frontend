@@ -63,10 +63,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Read directly from localStorage — no context dependency
-    const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
-    if (!token || !storedUser) {
+    if (!storedUser) {
       router.push('/login');
       return;
     }
