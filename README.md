@@ -41,7 +41,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
+Open https://bloodlink1.vercel.app/ with your browser to see the application.
 
 ---
 
