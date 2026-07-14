@@ -51,8 +51,9 @@ interface BloodRequest {
 export default function DashboardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeRequests, setActiveRequests] = useState<BloodRequest[]>([]);
-  const [myRequests, setMyRequests] = useState<BloodRequest[]>([]);
+  const [activeRequests, setActiveRequests] = useState<BloodRequest[]>([]); // Compatible matches
+  const [myRequests, setMyRequests] = useState<BloodRequest[]>([]); // User's own requests
+  const [allActiveRequests, setAllActiveRequests] = useState<BloodRequest[]>([]); // Global feed
   const [loading, setLoading] = useState(true);
 
   // Fulfillment Dialog State
@@ -72,13 +73,15 @@ export default function DashboardPage() {
 
     const parsedUser = JSON.parse(storedUser);
 
-    // Fetch data
+    // Fetch data: compatible donor alerts, user requests, and global active requests
     Promise.all([
-      api.get('/requests/active'),
+      api.get('/requests/compatible'),
       api.get('/requests'),
-    ]).then(([active, mine]) => {
-      setActiveRequests(active.data);
+      api.get('/requests/active'),
+    ]).then(([compatible, mine, active]) => {
+      setActiveRequests(compatible.data);
       setMyRequests(mine.data);
+      setAllActiveRequests(active.data);
       setTimeout(() => {
         setCurrentUser(parsedUser);
       }, 0);
@@ -107,11 +110,15 @@ export default function DashboardPage() {
         donorIds: selectedDonors,
       });
       
-      // Refresh active and personal requests
-      const resActive = await api.get('/requests/active');
-      const resMine = await api.get('/requests');
-      setActiveRequests(resActive.data);
+      // Refresh all request lists
+      const [resCompatible, resMine, resActive] = await Promise.all([
+        api.get('/requests/compatible'),
+        api.get('/requests'),
+        api.get('/requests/active'),
+      ]);
+      setActiveRequests(resCompatible.data);
       setMyRequests(resMine.data);
+      setAllActiveRequests(resActive.data);
       
       setFulfillModalOpen(false);
       setSelectedRequest(null);
@@ -160,89 +167,137 @@ export default function DashboardPage() {
             </Button>
           </Link>
         </div>
+        {/* Main Dashboard Side-by-Side Panels */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          
+          {/* Left Column: My Requests */}
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
+              📋 My Requests
+              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                {myRequests.length}
+              </Badge>
+            </h2>
 
-        {/* Active Requests */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            🔴 Active Blood Requests
-            <Badge variant="destructive">{activeRequests.length}</Badge>
-          </h2>
-
-          {activeRequests.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8 text-gray-500">
-                No active requests right now.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {activeRequests.map(req => (
-                <Card key={req.id} className="border-l-4 border-l-red-500">
-                  <CardContent className="pt-4">
-                    <div className="flex justify-between items-start">
+            {myRequests.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                <span className="text-3xl block mb-2">📋</span>
+                You haven&apos;t posted any blood requests yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myRequests.map(req => (
+                  <Card key={req.id} className="border border-gray-100 shadow-sm hover:border-red-100 transition-colors">
+                    <CardContent className="pt-4 flex justify-between items-center gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-2xl font-bold text-red-600">{req.bloodType}</span>
-                          <Badge className={urgencyColor(req.urgency)}>
-                            {req.urgency.toUpperCase()}
+                          <span className="font-bold text-red-600 text-lg">{req.bloodType}</span>
+                          <Badge variant={req.status === 'active' ? 'destructive' : 'secondary'}>
+                            {req.status.toUpperCase()}
                           </Badge>
-                          <Badge variant="outline">{req.units} units needed</Badge>
                         </div>
-                        <p className="font-medium text-gray-900">{req.hospital}</p>
-                        <p className="text-sm text-gray-600">{req.address}</p>
-                        {req.requester && (
-                          <p className="text-sm text-gray-500 mt-1">
-                            Contact: {req.requester.name} — {req.requester.phone}
-                          </p>
-                        )}
+                        <p className="text-sm font-medium text-gray-900 line-clamp-1">{req.hospital}</p>
+                        <p className="text-xs text-gray-500">{req.donorsConfirmed}/{req.donorsNotified} donors confirmed</p>
                       </div>
-                      <div className="text-right text-sm text-gray-500">
-                        <p>{req.donorsNotified} notified</p>
-                        <p className="text-green-600">{req.donorsConfirmed} confirmed</p>
-                        <p className="mt-1">{new Date(req.createdAt).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* My Requests */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4">📋 My Requests</h2>
-          {myRequests.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8 text-gray-500">
-                You haven&apos;t posted any requests yet.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {myRequests.map(req => (
-                <Card key={req.id}>
-                  <CardContent className="pt-4 flex justify-between items-center">
-                    <div>
-                      <span className="font-bold text-red-600 mr-2">{req.bloodType}</span>
-                      <span className="text-gray-700">{req.hospital}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-500">
-                        {req.donorsConfirmed}/{req.donorsNotified} confirmed
-                      </span>
-                      <Badge variant={req.status === 'active' ? 'destructive' : 'secondary'}>
-                        {req.status}
-                      </Badge>
                       {req.status === 'active' && (
                         <Button
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white font-medium ml-1"
+                          className="bg-green-600 hover:bg-green-700 text-white font-medium shrink-0 shadow-sm ml-1"
                           onClick={() => openFulfillModal(req)}
                         >
                           Fulfill
                         </Button>
                       )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Right Column: Compatible Match Alerts */}
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
+              🚨 Compatible Match Alerts
+              <Badge variant="destructive">{activeRequests.length}</Badge>
+            </h2>
+
+            {activeRequests.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                <span className="text-3xl block mb-2">🤝</span>
+                No compatible requests matching your blood type right now.
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                {activeRequests.map(req => (
+                  <Card key={req.id} className="border-l-4 border-l-red-500 border-t border-r border-b border-gray-100 shadow-sm">
+                    <CardContent className="pt-4">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl font-bold text-red-600">{req.bloodType}</span>
+                            <Badge className={urgencyColor(req.urgency)}>
+                              {req.urgency.toUpperCase()}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs font-semibold">{req.units} units</Badge>
+                          </div>
+                          <p className="font-semibold text-gray-900 text-sm">{req.hospital}</p>
+                          <p className="text-xs text-gray-600 line-clamp-1">{req.address}</p>
+                          {req.requester && (
+                            <p className="text-xs text-gray-500 font-medium mt-1">
+                              Contact: {req.requester.name} — {req.requester.phone}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right text-xs text-gray-400 shrink-0 space-y-1">
+                          <p>{req.donorsNotified} notified</p>
+                          <p className="text-green-600 font-semibold">{req.donorsConfirmed} confirmed</p>
+                          <p className="text-[10px] mt-1">{new Date(req.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+
+        </div>
+
+        {/* Bottom Full-Width Feed: All Active Requests */}
+        <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
+            🌍 All Active Requests (Global Registry)
+            <Badge variant="outline" className="bg-red-50 text-red-600 border-red-100">
+              {allActiveRequests.length}
+            </Badge>
+          </h2>
+
+          {allActiveRequests.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 bg-gray-50/50 rounded-xl border border-gray-100">
+              No other active blood requests posted on the platform.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allActiveRequests.map(req => (
+                <Card key={req.id} className="border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="pt-4 flex flex-col justify-between h-full min-h-[140px]">
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-red-600 text-lg">{req.bloodType}</span>
+                          <span className="text-xs text-gray-400">• {req.units} units</span>
+                        </div>
+                        <Badge className={`${urgencyColor(req.urgency)} text-[10px] px-1.5 py-0.5`}>
+                          {req.urgency.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <p className="text-xs font-semibold text-gray-900 line-clamp-1">{req.hospital}</p>
+                      <p className="text-[11px] text-gray-500 line-clamp-1 mb-2">{req.address}</p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-50 flex justify-between items-center text-[10px] text-gray-400 mt-2">
+                      <span>Posted {new Date(req.createdAt).toLocaleDateString()}</span>
+                      <span className="text-green-600 font-medium">{req.donorsConfirmed} confirmed</span>
                     </div>
                   </CardContent>
                 </Card>
